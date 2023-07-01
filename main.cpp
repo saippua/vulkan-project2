@@ -820,7 +820,9 @@ private:
     }
 
     void drawFrame() {
-        device->waitForFences(1, &inFlightFences[currentFrame], VK_TRUE, std::numeric_limits<uint64_t>::max());
+        if (device->waitForFences(1, &inFlightFences[currentFrame], VK_TRUE, std::numeric_limits<uint64_t>::max()) != vk::Result::eSuccess) {
+          throw std::runtime_error("waitForFences timed out!");
+        }
 
         uint32_t imageIndex;
         try {
@@ -849,7 +851,9 @@ private:
         submitInfo.signalSemaphoreCount = 1;
         submitInfo.pSignalSemaphores = signalSemaphores;
 
-        device->resetFences(1, &inFlightFences[currentFrame]);
+        if (device->resetFences(1, &inFlightFences[currentFrame]) != vk::Result::eSuccess) {
+          throw std::runtime_error("failed to reset fences!");
+        }
 
         try {
             graphicsQueue.submit(submitInfo, inFlightFences[currentFrame]);

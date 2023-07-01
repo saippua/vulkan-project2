@@ -16,8 +16,8 @@ br:
     just build
     just run
 
-# compile-shaders:
-#     glslc ./resources/shaders/source/shader.vert -o ./resources/shaders/vert.spv
-#     glslc ./resources/shaders/source/shader.frag -o ./resources/shaders/frag.spv
-#     glslc ./resources/shaders/source/texture_shader.vert -o ./resources/shaders/texture_vert.spv
-#     glslc ./resources/shaders/source/texture_shader.frag -o ./resources/shaders/texture_frag.spv
+compile-shaders:
+    glslc ./shaders/source/shader.vert -o ./shaders/vert.spv
+    glslc ./shaders/source/shader.frag -o ./shaders/frag.spv
+    glslc ./shaders/source/texture_shader.vert -o ./shaders/texture_vert.spv
+    glslc ./shaders/source/texture_shader.frag -o ./shaders/texture_frag.spv

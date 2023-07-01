@@ -20,7 +20,8 @@ const int HEIGHT = 600;
 const int MAX_FRAMES_IN_FLIGHT = 2;
 
 const std::vector<const char*> validationLayers = {
-    "VK_LAYER_LUNARG_standard_validation"
+    // "VK_LAYER_LUNARG_standard_validation"
+    "VK_LAYER_KHRONOS_validation"
 };
 
 const std::vector<const char*> deviceExtensions = {
@@ -551,7 +552,7 @@ private:
         viewport.maxDepth = 1.0f;
 
         vk::Rect2D scissor = {};
-        scissor.offset = { 0, 0 };
+        scissor.offset = vk::Offset2D { 0, 0 };
         scissor.extent = swapChainExtent;
 
         vk::PipelineViewportStateCreateInfo viewportState = {};
@@ -612,7 +613,7 @@ private:
         pipelineInfo.basePipelineHandle = nullptr;
 
         try {
-            graphicsPipeline = device->createGraphicsPipeline(nullptr, pipelineInfo);
+            graphicsPipeline = device->createGraphicsPipeline(nullptr, pipelineInfo).value;
         }
         catch (vk::SystemError err) {
             throw std::runtime_error("failed to create graphics pipeline!");
@@ -775,7 +776,7 @@ private:
             vk::RenderPassBeginInfo renderPassInfo = {};
             renderPassInfo.renderPass = renderPass;
             renderPassInfo.framebuffer = swapChainFramebuffers[i];
-            renderPassInfo.renderArea.offset = { 0, 0 };
+            renderPassInfo.renderArea.offset = vk::Offset2D { 0, 0 };
             renderPassInfo.renderArea.extent = swapChainExtent;
 
             vk::ClearValue clearColor = { std::array<float, 4>{ 0.0f, 0.0f, 0.0f, 1.0f } };

@@ -101,9 +101,12 @@ struct Vertex {
   }
 };
 
-const std::vector<Vertex> vertices = {{{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-                                      {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
-                                      {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}};
+const std::vector<Vertex> vertices = {{{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+                                      {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+                                      {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+                                      {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}};
+
+const std::vector<uint16_t> indices = {0, 1, 2, 2, 3, 0};
 
 class HelloTriangleApplication {
 public:
@@ -142,6 +145,8 @@ private:
 
   vk::Buffer vertexBuffer;
   vk::DeviceMemory vertexBufferMemory;
+  vk::Buffer indexBuffer;
+  vk::DeviceMemory indexBufferMemory;
 
   std::vector<vk::CommandBuffer, std::allocator<vk::CommandBuffer>>
       commandBuffers;
@@ -183,6 +188,7 @@ private:
     createFramebuffers();
     createCommandPool();
     createVertexBuffer();
+    createIndexBuffer();
     createCommandBuffers();
     createSyncObjects();
   }
@@ -221,6 +227,9 @@ private:
 
     device->destroyBuffer(vertexBuffer);
     device->freeMemory(vertexBufferMemory);
+
+    device->destroyBuffer(indexBuffer);
+    device->freeMemory(indexBufferMemory);
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
       device->destroySemaphore(renderFinishedSemaphores[i]);
@@ -681,6 +690,34 @@ private:
     device->freeMemory(stagingBufferMemory);
   }
 
+  // (TODO) this is very similar to createVertexBuffer. The two functions could
+  // probably be merged
+  void createIndexBuffer() {
+    vk::DeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+
+    vk::Buffer stagingBuffer;
+    vk::DeviceMemory stagingBufferMemory;
+    createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferSrc,
+                 vk::MemoryPropertyFlagBits::eHostVisible |
+                     vk::MemoryPropertyFlagBits::eHostCoherent,
+                 stagingBuffer, stagingBufferMemory);
+
+    void *data = device->mapMemory(stagingBufferMemory, 0, bufferSize);
+    memcpy(data, indices.data(), (size_t)bufferSize);
+    device->unmapMemory(stagingBufferMemory);
+
+    createBuffer(bufferSize,
+                 vk::BufferUsageFlagBits::eTransferDst |
+                     vk::BufferUsageFlagBits::eIndexBuffer,
+                 vk::MemoryPropertyFlagBits::eDeviceLocal, indexBuffer,
+                 indexBufferMemory);
+
+    copyBuffer(stagingBuffer, indexBuffer, bufferSize);
+
+    device->destroyBuffer(stagingBuffer);
+    device->freeMemory(stagingBufferMemory);
+  }
+
   void createBuffer(vk::DeviceSize size, vk::BufferUsageFlags usage,
                     vk::MemoryPropertyFlags properties, vk::Buffer &buffer,
                     vk::DeviceMemory &bufferMemory) {
@@ -805,7 +842,10 @@ private:
       vk::DeviceSize offsets[] = {0};
       commandBuffers[i].bindVertexBuffers(0, 1, vertexBuffers, offsets);
 
-      commandBuffers[i].draw(static_cast<uint32_t>(vertices.size()), 1, 0, 0);
+      commandBuffers[i].bindIndexBuffer(indexBuffer, 0, vk::IndexType::eUint16);
+
+      commandBuffers[i].drawIndexed(static_cast<uint32_t>(indices.size()), 1, 0,
+                                    0, 0);
 
       commandBuffers[i].endRenderPass();
 

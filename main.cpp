@@ -1,7 +1,7 @@
+#define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
-#include <vulkan/vulkan.hpp>
-
 #include <glm/glm.hpp>
+#include <vulkan/vulkan.hpp>
 
 #include <algorithm>
 #include <array>
@@ -287,7 +287,7 @@ private:
 
     try {
       instance = vk::createInstanceUnique(createInfo, nullptr);
-    } catch (vk::SystemError err) {
+    } catch (vk::SystemError &err) {
       throw std::runtime_error("failed to create instance!");
     }
   }
@@ -381,7 +381,7 @@ private:
 
     try {
       device = physicalDevice.createDeviceUnique(createInfo);
-    } catch (vk::SystemError err) {
+    } catch (vk::SystemError &err) {
       throw std::runtime_error("failed to create logical device!");
     }
 
@@ -432,7 +432,7 @@ private:
 
     try {
       swapChain = device->createSwapchainKHR(createInfo);
-    } catch (vk::SystemError err) {
+    } catch (vk::SystemError &err) {
       throw std::runtime_error("failed to create swap chain!");
     }
 
@@ -462,7 +462,7 @@ private:
 
       try {
         swapChainImageViews[i] = device->createImageView(createInfo);
-      } catch (vk::SystemError err) {
+      } catch (vk::SystemError &err) {
         throw std::runtime_error("failed to create image views!");
       }
     }
@@ -507,7 +507,7 @@ private:
 
     try {
       renderPass = device->createRenderPass(renderPassInfo);
-    } catch (vk::SystemError err) {
+    } catch (vk::SystemError &err) {
       throw std::runtime_error("failed to create render pass!");
     }
   }
@@ -595,7 +595,7 @@ private:
 
     try {
       pipelineLayout = device->createPipelineLayout(pipelineLayoutInfo);
-    } catch (vk::SystemError err) {
+    } catch (vk::SystemError &err) {
       throw std::runtime_error("failed to create pipeline layout!");
     }
 
@@ -616,7 +616,7 @@ private:
     try {
       graphicsPipeline =
           device->createGraphicsPipeline(nullptr, pipelineInfo).value;
-    } catch (vk::SystemError err) {
+    } catch (vk::SystemError &err) {
       throw std::runtime_error("failed to create graphics pipeline!");
     }
   }
@@ -637,7 +637,7 @@ private:
 
       try {
         swapChainFramebuffers[i] = device->createFramebuffer(framebufferInfo);
-      } catch (vk::SystemError err) {
+      } catch (vk::SystemError &err) {
         throw std::runtime_error("failed to create framebuffer!");
       }
     }
@@ -650,7 +650,7 @@ private:
 
     try {
       commandPool = device->createCommandPool(poolInfo);
-    } catch (vk::SystemError err) {
+    } catch (vk::SystemError &err) {
       throw std::runtime_error("failed to create command pool!");
     }
   }
@@ -691,7 +691,7 @@ private:
 
     try {
       buffer = device->createBuffer(bufferInfo);
-    } catch (vk::SystemError err) {
+    } catch (vk::SystemError &err) {
       throw std::runtime_error("failed to create buffer!");
     }
 
@@ -705,7 +705,7 @@ private:
 
     try {
       bufferMemory = device->allocateMemory(allocInfo);
-    } catch (vk::SystemError err) {
+    } catch (vk::SystemError &err) {
       throw std::runtime_error("failed to allocate buffer memory!");
     }
 
@@ -770,7 +770,7 @@ private:
 
     try {
       commandBuffers = device->allocateCommandBuffers(allocInfo);
-    } catch (vk::SystemError err) {
+    } catch (vk::SystemError &err) {
       throw std::runtime_error("failed to allocate command buffers!");
     }
 
@@ -780,7 +780,7 @@ private:
 
       try {
         commandBuffers[i].begin(beginInfo);
-      } catch (vk::SystemError err) {
+      } catch (vk::SystemError &err) {
         throw std::runtime_error("failed to begin recording command buffer!");
       }
 
@@ -811,7 +811,7 @@ private:
 
       try {
         commandBuffers[i].end();
-      } catch (vk::SystemError err) {
+      } catch (vk::SystemError &err) {
         throw std::runtime_error("failed to record command buffer!");
       }
     }
@@ -829,7 +829,7 @@ private:
         inFlightFences[i] =
             device->createFence({vk::FenceCreateFlagBits::eSignaled});
       }
-    } catch (vk::SystemError err) {
+    } catch (vk::SystemError &err) {
       throw std::runtime_error(
           "failed to create synchronization objects for a frame!");
     }
@@ -848,10 +848,10 @@ private:
           swapChain, std::numeric_limits<uint64_t>::max(),
           imageAvailableSemaphores[currentFrame], nullptr);
       imageIndex = result.value;
-    } catch (vk::OutOfDateKHRError err) {
+    } catch (vk::OutOfDateKHRError &err) {
       recreateSwapChain();
       return;
-    } catch (vk::SystemError err) {
+    } catch (vk::SystemError &err) {
       throw std::runtime_error("failed to acquire swap chain image!");
     }
 
@@ -878,7 +878,7 @@ private:
 
     try {
       graphicsQueue.submit(submitInfo, inFlightFences[currentFrame]);
-    } catch (vk::SystemError err) {
+    } catch (vk::SystemError &err) {
       throw std::runtime_error("failed to submit draw command buffer!");
     }
 
@@ -894,9 +894,9 @@ private:
     vk::Result resultPresent;
     try {
       resultPresent = presentQueue.presentKHR(presentInfo);
-    } catch (vk::OutOfDateKHRError err) {
+    } catch (vk::OutOfDateKHRError &err) {
       resultPresent = vk::Result::eErrorOutOfDateKHR;
-    } catch (vk::SystemError err) {
+    } catch (vk::SystemError &err) {
       throw std::runtime_error("failed to present swap chain image!");
     }
 
@@ -915,7 +915,7 @@ private:
       return device->createShaderModuleUnique(
           {vk::ShaderModuleCreateFlags(), code.size(),
            reinterpret_cast<const uint32_t *>(code.data())});
-    } catch (vk::SystemError err) {
+    } catch (vk::SystemError &err) {
       throw std::runtime_error("failed to create shader module!");
     }
   }

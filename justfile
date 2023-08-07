@@ -1,16 +1,17 @@
-toolchain := "../../Software/glfw/CMake/x86_64-w64-mingw32.cmake"
+# toolchain := "../../Software/glfw/CMake/x86_64-w64-mingw32.cmake"
 
 alias b := build
 alias r := run
 
 build:
+    # rm -r build
     mkdir -p build
     cd build && \
-    cmake -D CMAKE_TOOLCHAIN_FILE={{toolchain}} -DCMAKE_EXPORT_COMPILE_COMMANDS=ON .. && \
+    cmake .. && \
     make
 
 run:
-    ./build/VulkanProject.exe
+    ./build/VulkanStandalone.exe
 
 br:
     just build

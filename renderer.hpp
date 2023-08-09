@@ -27,9 +27,6 @@
 #include "timing.hpp"
 // #include "fps.hh"
 
-const int WIDTH = 800;
-const int HEIGHT = 600;
-
 const int MAX_FRAMES_IN_FLIGHT = 2;
 
 const std::vector<const char *> validationLayers = {
@@ -37,7 +34,15 @@ const std::vector<const char *> validationLayers = {
   "VK_LAYER_KHRONOS_validation"
 };
 
-const std::vector<const char *> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+const std::vector<const char *> deviceExtensions = {
+  VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+};
+
+const VkPhysicalDeviceFeatures requiredFeatures {
+  .multiViewport = VK_TRUE,
+};
+
+// const VkPhysicalDeviceFeatures optionalFeatures {};
 
 #ifdef NDEBUG
 const bool enableValidationLayers = false;
@@ -522,7 +527,7 @@ private:
                                    &queuePriority });
     }
 
-    auto deviceFeatures = vk::PhysicalDeviceFeatures();
+    auto deviceFeatures = vk::PhysicalDeviceFeatures(requiredFeatures);
     auto createInfo = vk::DeviceCreateInfo(
         vk::DeviceCreateFlags(),
         static_cast<uint32_t>(queueCreateInfos.size()),
@@ -1342,6 +1347,7 @@ private:
     QueueFamilyIndices indices = findQueueFamilies(device);
 
     bool extensionsSupported = checkDeviceExtensionSupport(device);
+    bool featuresSupported = checkDeviceFeatureSupport(device);
 
     bool swapChainAdequate = false;
     if (extensionsSupported) {
@@ -1349,7 +1355,7 @@ private:
       swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
     }
 
-    return indices.isComplete() && extensionsSupported && swapChainAdequate;
+    return indices.isComplete() && extensionsSupported && featuresSupported && swapChainAdequate;
   }
 
   bool checkDeviceExtensionSupport(const vk::PhysicalDevice &device)
@@ -1361,6 +1367,28 @@ private:
     }
 
     return requiredExtensions.empty();
+  }
+
+  bool checkDeviceFeatureSupport(const vk::PhysicalDevice &device)
+  {
+    VkPhysicalDeviceFeatures deviceFeatures = device.getFeatures();
+    // NOTE: This functions implementation is a bit sketchy. It depends on the structure memory being contiguous and
+    // there being no padding.
+
+    // Bitwise compare the features we have to the features we require.
+    // We can have extra features, but required features must be present.
+    size_t size = sizeof(VkPhysicalDeviceFeatures) / sizeof(VkBool32);
+    const VkBool32 *d = reinterpret_cast<const VkBool32 *>(&deviceFeatures);   // Device feature bytes
+    const VkBool32 *r = reinterpret_cast<const VkBool32 *>(&requiredFeatures); // Required feature bytes
+
+    for (size_t i = 0; i < size; i++) {
+      std::bitset<sizeof(VkBool32) * 8> bs(d[i]);
+      if ((~d[i] & r[i]) != 0) {
+        std::cout << "Required feature " << i << " missing!" << std::endl;
+        return false;
+      }
+    }
+    return true;
   }
 
   QueueFamilyIndices findQueueFamilies(vk::PhysicalDevice device)

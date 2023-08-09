@@ -12,8 +12,6 @@ set(SHARED_LIBRARY_NAME "VulkanRenderer")
 
 project("VulkanProject" LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(LD_DEBUG all)
 
 add_compile_options(-Wall)
@@ -34,14 +32,14 @@ add_subdirectory("/home/saippua/Software/glm" "${CMAKE_SOURCE_DIR}/build/deps/gl
 
 
 # Targets
-# add_executable(${EXECUTABLE_NAME} "./main.cpp")
-#
-# target_include_directories(${EXECUTABLE_NAME} 
-#     PRIVATE "$ENV{VULKAN_SDK}/Include")
-#
-#   target_link_libraries(${EXECUTABLE_NAME} 
-#     PRIVATE ${Vulkan_LIBRARIES}
-#     PRIVATE glfw glm pthread)
+add_executable(${EXECUTABLE_NAME} "./main.cpp")
+
+target_include_directories(${EXECUTABLE_NAME} 
+    PRIVATE "$ENV{VULKAN_SDK}/Include")
+
+  target_link_libraries(${EXECUTABLE_NAME} 
+    PRIVATE ${Vulkan_LIBRARIES}
+    PRIVATE glfw glm pthread)
 
 add_library(${SHARED_LIBRARY_NAME} SHARED "./api.cpp")
 

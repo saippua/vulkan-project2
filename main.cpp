@@ -7,27 +7,28 @@
 
 #include <memory>
 
-class Core {
+const int WIDTH = 800;
+const int HEIGHT = 600;
+
+class Standalone {
 public:
-  Core()
+  Standalone()
   {
+    surfaceInfo.height = HEIGHT;
+    surfaceInfo.width = WIDTH;
 
-    surfaceInfo = std::make_shared<SurfaceInfo>();
-    surfaceInfo->height = HEIGHT;
-    surfaceInfo->width = WIDTH;
+    initWindow(surfaceInfo);
 
-    renderer.surfaceInfo = surfaceInfo;
+    renderer.attach(surfaceInfo);
 
-    initWindow(*surfaceInfo);
 
-    renderer.init();
-    renderer.start();
+    // renderer.init();
+    // renderer.start();
 
     while (!glfwWindowShouldClose(window)) {
       glfwPollEvents();
     }
-
-    renderer.shutdown();
+    renderer.detach();
 
     glfwDestroyWindow(window);
     glfwTerminate();
@@ -36,7 +37,7 @@ public:
 private:
   Renderer renderer;
   GLFWwindow *window;
-  std::shared_ptr<SurfaceInfo> surfaceInfo;
+  SurfaceInfo surfaceInfo;
 
   void initWindow(SurfaceInfo &extent)
   {
@@ -47,8 +48,8 @@ private:
     window = glfwCreateWindow(extent.width, extent.height, "Vulkan", nullptr, nullptr);
     glfwSetWindowUserPointer(window, this);
     glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
-    surfaceInfo->hwnd = glfwGetWin32Window(window);
-    surfaceInfo->hinstance = GetModuleHandle(nullptr);
+    surfaceInfo.hwnd = glfwGetWin32Window(window);
+    surfaceInfo.hinstance = GetModuleHandle(nullptr);
 
     uint32_t glfwExtensionCount;
     const char **glfwExtensions;
@@ -60,17 +61,17 @@ private:
 
     std::vector<const char *> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
 
-    surfaceInfo->glfwExtensions = extensions;
+    surfaceInfo.glfwExtensions = extensions;
   }
 
   static void framebufferResizeCallback(GLFWwindow *window, const int width, const int height)
   {
-    Core *core = reinterpret_cast<Core *>(glfwGetWindowUserPointer(window));
+    Standalone *core = reinterpret_cast<Standalone *>(glfwGetWindowUserPointer(window));
     // core->surfaceInfo->width = width;
     // core->surfaceInfo->height = height;
-    core->surfaceInfo->width = 120;
-    core->surfaceInfo->height = 64;
-    core->surfaceInfo->isResized = true;
+    core->surfaceInfo.width = 120;
+    core->surfaceInfo.height = 64;
+    core->surfaceInfo.isResized = true;
   }
 };
 
@@ -78,7 +79,7 @@ int main()
 {
 
   try {
-    Core();
+    Standalone();
   }
   catch (const std::exception &e) {
     std::cerr << e.what() << std::endl;

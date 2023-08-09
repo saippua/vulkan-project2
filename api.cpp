@@ -25,8 +25,8 @@ SHAREDVULKAN_API int attachRenderer(void *ptr, HWND handle, HINSTANCE instance)
   Renderer *vulkan = static_cast<Renderer *>(ptr);
 
   SurfaceInfo surfaceInfo {};
-  surfaceInfo.height = HEIGHT;
-  surfaceInfo.width = WIDTH;
+  surfaceInfo.height = 0; // We need to get these from Avalonia
+  surfaceInfo.width = 0;
 
   surfaceInfo.hwnd = handle;
   surfaceInfo.hinstance = instance;

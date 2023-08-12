@@ -25,6 +25,8 @@
 
 #include "interop.h"
 #include "timing.hpp"
+
+#include "debugging.hpp"
 // #include "fps.hh"
 
 const int MAX_FRAMES_IN_FLIGHT = 2;
@@ -43,42 +45,6 @@ const VkPhysicalDeviceFeatures requiredFeatures {
 };
 
 // const VkPhysicalDeviceFeatures optionalFeatures {};
-
-#ifdef NDEBUG
-const bool enableValidationLayers = false;
-#else
-const bool enableValidationLayers = true;
-#endif
-
-inline static DebugCallback externalDebugCallback = nullptr;
-
-inline VkResult CreateDebugUtilsMessengerEXT(
-    VkInstance instance,
-    const VkDebugUtilsMessengerCreateInfoEXT *pCreateInfo,
-    const VkAllocationCallbacks *pAllocator,
-    VkDebugUtilsMessengerEXT *pCallback
-)
-{
-  auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
-  if (func != nullptr) {
-    return func(instance, pCreateInfo, pAllocator, pCallback);
-  }
-  else {
-    return VK_ERROR_EXTENSION_NOT_PRESENT;
-  }
-}
-
-inline void DestroyDebugUtilsMessengerEXT(
-    VkInstance instance,
-    VkDebugUtilsMessengerEXT callback,
-    const VkAllocationCallbacks *pAllocator
-)
-{
-  auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
-  if (func != nullptr) {
-    func(instance, callback, pAllocator);
-  }
-}
 
 struct SurfaceInfo {
   int width;
@@ -153,8 +119,8 @@ class Renderer {
 public:
   Renderer(DebugCallback debugCallback)
   {
-    externalDebugCallback = debugCallback;
-    debugOutput("External debug callback installed!");
+    vdb::externalDebugCallback = debugCallback;
+    vdb::debugOutput("External debug callback installed!");
   }
 
   Renderer() {}
@@ -171,14 +137,14 @@ public:
           mainLoop();
         }
         catch (std::exception &e) {
-          debugOutput(e.what());
+        vdb::debugOutput(e.what());
           detach();
         }
       });
-      debugOutput("Vulkan Renderer attached!");
+      vdb::debugOutput("Vulkan Renderer attached!");
     }
     catch (std::exception &e) {
-      debugOutput(e.what());
+      vdb::debugOutput(e.what());
     }
   }
 
@@ -187,7 +153,7 @@ public:
     isRunning = false;
     m_thread.join();
     cleanup();
-    debugOutput("Vulkan Renderer detached!");
+    vdb::debugOutput("Vulkan Renderer detached!");
   }
 
   void setMonitorCallback(PerformanceMonitorCallback callback)
@@ -211,7 +177,6 @@ private:
   SurfaceInfo m_surfaceInfo;
 
   vk::Instance instance;
-  VkDebugUtilsMessengerEXT callback;
   vk::SurfaceKHR surface;
 
   vk::PhysicalDevice physicalDevice;
@@ -255,7 +220,7 @@ private:
   void initVulkan()
   {
     createInstance();
-    setupDebugCallback();
+    vdb::setupDebugCallback(instance);
     createSurface();
     pickPhysicalDevice();
     createLogicalDevice();
@@ -305,7 +270,7 @@ private:
         }
       }
       catch (std::exception &e) {
-        debugOutput(e.what());
+        vdb::debugOutput(e.what());
       }
     }
 
@@ -360,19 +325,14 @@ private:
     device.destroyCommandPool(commandPool);
     device.destroy();
 
-    // surface is created by glfw, therefore not using a Unique handle
     instance.destroySurfaceKHR(surface);
 
-    if (enableValidationLayers) {
-      DestroyDebugUtilsMessengerEXT(instance, callback, nullptr);
+    if (vdb::enableValidationLayers) {
+      vdb::DestroyDebugUtilsMessengerEXT(instance, vdb::callback, nullptr);
     }
 
 
     instance.destroy();
-
-    // glfwDestroyWindow(window);
-    //
-    // glfwTerminate();
   }
 
   void recreateSwapChain()
@@ -381,8 +341,6 @@ private:
     while (width == 0 || height == 0) {
       width = m_surfaceInfo.width;
       height = m_surfaceInfo.height;
-      // glfwGetFramebufferSize(window, &width, &height);
-      // glfwWaitEvents();
     }
     std::cout << "Resized. new size: " << width << " " << height << std::endl;
 
@@ -400,7 +358,7 @@ private:
 
   void createInstance()
   {
-    if (enableValidationLayers && !checkValidationLayerSupport()) {
+    if (vdb::enableValidationLayers && !vdb::checkValidationLayerSupport()) {
       throw std::runtime_error("validation layers requested, but not available!");
     }
 
@@ -423,7 +381,7 @@ private:
         extensions.data() // enabled extensions
     );
 
-    if (enableValidationLayers) {
+    if (vdb::enableValidationLayers) {
       createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
       createInfo.ppEnabledLayerNames = validationLayers.data();
     }
@@ -436,46 +394,6 @@ private:
     }
   }
 
-  void setupDebugCallback()
-  {
-    if (!enableValidationLayers)
-      return;
-
-    auto createInfo = vk::DebugUtilsMessengerCreateInfoEXT(
-        vk::DebugUtilsMessengerCreateFlagsEXT(),
-        vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
-            vk::DebugUtilsMessageSeverityFlagBitsEXT::eError,
-        vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation |
-            vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance,
-        debugCallback,
-        nullptr
-    );
-
-    // NOTE: Vulkan-hpp has methods for this, but they trigger linking errors...
-    // instance.createDebugUtilsMessengerEXT(createInfo);
-    // instance.createDebugUtilsMessengerEXTUnique(createInfo);
-
-    // NOTE: reinterpret_cast is also used by vulkan.hpp internally for all
-    // these structs
-    if (CreateDebugUtilsMessengerEXT(
-            instance,
-            reinterpret_cast<const VkDebugUtilsMessengerCreateInfoEXT *>(&createInfo),
-            nullptr,
-            &callback
-        ) != VK_SUCCESS) {
-      throw std::runtime_error("failed to set up debug callback!");
-    }
-  }
-
-  // void createSurface() {
-  //   VkSurfaceKHR rawSurface;
-  //   if (glfwCreateWindowSurface(*instance, window, nullptr, &rawSurface) !=
-  //       VK_SUCCESS) {
-  //     throw std::runtime_error("failed to create window surface!");
-  //   }
-  //
-  //   surface = rawSurface;
-  // }
   void createSurface()
   {
     HWND hwnd = m_surfaceInfo.hwnd;
@@ -537,7 +455,7 @@ private:
     createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
     createInfo.ppEnabledExtensionNames = deviceExtensions.data();
 
-    if (enableValidationLayers) {
+    if (vdb::enableValidationLayers) {
       createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
       createInfo.ppEnabledLayerNames = validationLayers.data();
     }
@@ -1422,33 +1340,13 @@ private:
 
     std::vector<const char *> extensions = m_surfaceInfo.glfwExtensions;
 
-    if (enableValidationLayers) {
+    if (vdb::enableValidationLayers) {
       extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     }
 
     return extensions;
   }
 
-  bool checkValidationLayerSupport()
-  {
-    auto availableLayers = vk::enumerateInstanceLayerProperties();
-    for (const char *layerName : validationLayers) {
-      bool layerFound = false;
-
-      for (const auto &layerProperties : availableLayers) {
-        if (strcmp(layerName, layerProperties.layerName) == 0) {
-          layerFound = true;
-          break;
-        }
-      }
-
-      if (!layerFound) {
-        return false;
-      }
-    }
-
-    return true;
-  }
 
   static std::vector<char> readFile(const std::string &filename)
   {
@@ -1467,27 +1365,5 @@ private:
     file.close();
 
     return buffer;
-  }
-
-  static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
-      VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-      VkDebugUtilsMessageTypeFlagsEXT messageType,
-      const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
-      void *pUserData
-  )
-  {
-
-    std::cerr << "validation layer: ";
-    debugOutput(pCallbackData->pMessage);
-
-    return VK_FALSE;
-  }
-
-  static void debugOutput(const char *msg)
-  {
-    std::cerr << msg << std::endl;
-    if (externalDebugCallback) {
-      externalDebugCallback(msg);
-    }
   }
 };

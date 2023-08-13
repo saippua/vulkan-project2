@@ -17,6 +17,7 @@ const VkPhysicalDeviceFeatures requiredFeatures {
   .multiViewport = VK_TRUE,
 };
 
+// These structs feel like they're in the wrong place.
 struct QueueFamilyIndices {
   std::optional<uint32_t> graphicsFamily;
   std::optional<uint32_t> presentFamily;
@@ -24,22 +25,31 @@ struct QueueFamilyIndices {
   bool isComplete() { return graphicsFamily.has_value() && presentFamily.has_value(); }
 };
 
-struct SwapChainSupportDetails {
+struct SwapchainSupportDetails {
   vk::SurfaceCapabilitiesKHR capabilities;
   std::vector<vk::SurfaceFormatKHR> formats;
   std::vector<vk::PresentModeKHR> presentModes;
 };
 
-// const VkPhysicalDeviceFeatures optionalFeatures {};
 class Device {
 public:
   Device(vk::Instance *instance_, vk::SurfaceKHR *surface_) : instance(instance_), surface(surface_) {}
 
-  operator vk::Device&() { return device; }
-  // operator const vk::Device&() { return device; }
+  operator vk::Device&() { 
+    if (isInitialized) {
+      return device;
+    } else {
+      throw std::runtime_error("Device not initialized!");
+    }
+  }
 
-  operator vk::PhysicalDevice&() { return physicalDevice; } // Maybe this isnt a smart idea?
-  // operator const vk::PhysicalDevice&() {return physicalDevice; }
+  operator vk::PhysicalDevice&() { 
+    if (isInitialized) {
+      return physicalDevice;
+    } else {
+      throw std::runtime_error("Device not initialized!");
+    }
+  }
 
   vk::Device* operator->() { return &device; }
 
@@ -49,9 +59,11 @@ public:
   void initialize() {
     pickPhysicalDevice();
     createLogicalDevice();
+    isInitialized = true;
   }
 
 private:
+  bool isInitialized = false;
   vk::PhysicalDevice physicalDevice;
   vk::Device device;
   vk::Instance *instance;
@@ -126,13 +138,13 @@ private:
     bool extensionsSupported = checkDeviceExtensionSupport(device);
     bool featuresSupported = checkDeviceFeatureSupport(device);
 
-    bool swapChainAdequate = false;
+    bool swapchainAdequate = false;
     if (extensionsSupported) {
-      SwapChainSupportDetails swapChainSupport = querySwapchainSupport(device, *surface);
-      swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
+      SwapchainSupportDetails swapchainSupport = querySwapchainSupport(device, *surface);
+      swapchainAdequate = !swapchainSupport.formats.empty() && !swapchainSupport.presentModes.empty();
     }
 
-    return indices.isComplete() && extensionsSupported && featuresSupported && swapChainAdequate;
+    return indices.isComplete() && extensionsSupported && featuresSupported && swapchainAdequate;
     // return extensionsSupported && featuresSupported;
   }
 
@@ -195,9 +207,9 @@ public:
     return indices;
   }
 
-  static SwapChainSupportDetails querySwapchainSupport(const vk::PhysicalDevice &device, const vk::SurfaceKHR &surface)
+  static SwapchainSupportDetails querySwapchainSupport(const vk::PhysicalDevice &device, const vk::SurfaceKHR &surface)
   {
-    SwapChainSupportDetails details;
+    SwapchainSupportDetails details;
     details.capabilities = device.getSurfaceCapabilitiesKHR(surface);
     details.formats = device.getSurfaceFormatsKHR(surface);
     details.presentModes = device.getSurfacePresentModesKHR(surface);

@@ -1086,7 +1086,6 @@ private:
     if (resultPresent == vk::Result::eErrorOutOfDateKHR || resultPresent == vk::Result::eSuboptimalKHR ||
         m_surfaceInfo.isResized) {
       m_surfaceInfo.isResized = false;
-      // framebufferResized = false;
       recreateSwapchain();
       return;
     }

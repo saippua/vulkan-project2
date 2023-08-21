@@ -25,11 +25,40 @@ inline static DebugCallback externalDebugCallback = nullptr;
 
 inline VkDebugUtilsMessengerEXT callback;
 
-inline void debugOutput(const char *msg)
+namespace {
+  inline static void insert(std::string &msg, const std::string &var)
+  {
+    auto ind = msg.find("{}");
+    if (ind == std::string::npos) {
+      throw std::runtime_error("Incorrect number of arguments provided for format string.");
+    }
+    msg.replace(ind, 2, var);
+  }
+  inline static std::string &format(std::string &msg) { return msg; }
+  template <typename T> inline static std::string &format(std::string &msg, const T &last_arg)
+  {
+    std::ostringstream oss;
+    oss << last_arg;
+    insert(msg, oss.str());
+    return msg;
+  }
+  template <typename T, typename... Args>
+  inline static std::string &format(std::string &msg, const T &arg1, Args &&...args)
+  {
+    std::ostringstream oss;
+    oss << arg1;
+    insert(msg, oss.str());
+    format(msg, args...);
+    return msg;
+  }
+}
+
+template <typename... Args> inline void debugOutput(std::string msg, Args &&...args)
 {
+  format(msg, args...);
   std::cerr << msg << std::endl;
   if (externalDebugCallback) {
-    externalDebugCallback(msg);
+    externalDebugCallback(msg.c_str());
   }
 }
 

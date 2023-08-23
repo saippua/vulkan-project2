@@ -20,7 +20,7 @@ SHAREDVULKAN_API Renderer *initEngine(DebugCallback debugCallback)
   }
 }
 
-SHAREDVULKAN_API int attachRenderer(void *ptr, HWND handle, HINSTANCE instance)
+SHAREDVULKAN_API int attachRenderer(void *ptr, HWND handle)
 {
   Renderer *vulkan = static_cast<Renderer *>(ptr);
 
@@ -29,7 +29,7 @@ SHAREDVULKAN_API int attachRenderer(void *ptr, HWND handle, HINSTANCE instance)
   surfaceInfo.width = 0;
 
   surfaceInfo.hwnd = handle;
-  surfaceInfo.hinstance = instance;
+  surfaceInfo.hinstance = GetModuleHandle(nullptr);
   surfaceInfo.glfwExtensions = { "VK_KHR_surface", "VK_KHR_win32_surface" };
 
   vulkan->attach(surfaceInfo);
@@ -37,7 +37,7 @@ SHAREDVULKAN_API int attachRenderer(void *ptr, HWND handle, HINSTANCE instance)
   return 0;
 }
 
-SHAREDVULKAN_API int detachRenderer(void *ptr)
+SHAREDVULKAN_API int detachRenderer(void *ptr, HWND handle)
 {
   Renderer *vulkan = static_cast<Renderer *>(ptr);
   vulkan->detach();

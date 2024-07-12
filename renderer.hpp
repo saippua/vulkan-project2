@@ -32,8 +32,6 @@
 
 const int MAX_FRAMES_IN_FLIGHT = 2;
 
-// const VkPhysicalDeviceFeatures optionalFeatures {};
-
 struct SurfaceInfo {
   int width;
   int height;
@@ -93,14 +91,27 @@ struct UniformBufferObject {
 
 class Renderer {
 public:
-  Renderer(DebugCallback debugCallback) : device(Device(&instance, &surface))
+  Renderer(DebugCallback debugCallback)
   {
     vdb::externalDebugCallback = debugCallback;
     vdb::debugOutput("External debug callback installed!");
+    init();
   }
 
-  Renderer() : device(Device(&instance, &surface)) {}
+  Renderer() {
+    init();
+  }
 
+  ~Renderer() {
+    cleanup();
+  }
+
+  void init() {
+    createInstance();
+    vdb::setupDebugCallback(instance);
+    m_device = new Device(instance);
+    device = &static_cast<vk::Device&>(*m_device);
+  }
 
   void attach(SurfaceInfo &surfaceInfo)
   {
@@ -128,7 +139,7 @@ public:
   {
     isRunning = false;
     m_thread.join();
-    cleanup();
+    cleanupSwapchain();
     vdb::debugOutput("Vulkan Renderer detached!");
   }
 
@@ -152,7 +163,8 @@ private:
   std::thread m_thread;
   SurfaceInfo m_surfaceInfo;
 
-  Device device;
+  Device *m_device = nullptr;
+  vk::Device *device = nullptr;
 
   vk::Instance instance;
   vk::SurfaceKHR surface;
@@ -169,7 +181,6 @@ private:
   vk::PipelineLayout pipelineLayout;
   vk::Pipeline graphicsPipeline;
 
-  vk::CommandPool commandPool;
   vk::DescriptorPool descriptorPool;
   std::vector<vk::DescriptorSet> descriptorSets;
 
@@ -191,17 +202,13 @@ private:
 
   void initVulkan()
   {
-    createInstance();
-    vdb::setupDebugCallback(instance);
     createSurface();
-    device.initialize();
     createSwapchain();
     createImageViews();
     createRenderPass();
     createDescriptorSetLayout();
     createGraphicsPipeline();
     createFramebuffers();
-    createCommandPool();
     createVertexBuffer();
     createIndexBuffer();
     createUniformBuffers();
@@ -254,7 +261,7 @@ private:
       device->destroyFramebuffer(framebuffer);
     }
 
-    device->freeCommandBuffers(commandPool, commandBuffers);
+    device->freeCommandBuffers(m_device->commandPool, commandBuffers);
 
     device->destroyPipeline(graphicsPipeline);
     device->destroyPipelineLayout(pipelineLayout);
@@ -269,7 +276,7 @@ private:
 
   void cleanup()
   {
-    cleanupSwapchain();
+    // cleanupSwapchain();
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
       device->destroyBuffer(uniformBuffers[i]);
@@ -291,8 +298,7 @@ private:
       device->destroyFence(inFlightFences[i]);
     }
 
-    device->destroyCommandPool(commandPool);
-    device->destroy();
+    delete m_device;
 
     instance.destroySurfaceKHR(surface);
 
@@ -307,10 +313,10 @@ private:
   void recreateSwapchain()
   {
     int width = 0, height = 0;
-    while (width == 0 || height == 0) {
-      width = m_surfaceInfo.width;
-      height = m_surfaceInfo.height;
-    }
+    // while (width == 0 || height == 0) {
+    //   width = m_surfaceInfo.width;
+    //   height = m_surfaceInfo.height;
+    // }
     std::cout << "Resized. new size: " << width << " " << height << std::endl;
 
     device->waitIdle();
@@ -381,9 +387,7 @@ private:
 
   void createSwapchain()
   {
-    vk::PhysicalDevice &physicalDevice = device;
-
-    SwapchainSupportDetails swapchainSupport = Device::querySwapchainSupport(physicalDevice, surface);
+    SwapchainSupportDetails swapchainSupport = m_device->querySwapchainSupport(surface);
 
     vk::SurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapchainSupport.formats);
     vk::PresentModeKHR presentMode = chooseSwapPresentMode(swapchainSupport.presentModes);
@@ -405,7 +409,7 @@ private:
         vk::ImageUsageFlagBits::eColorAttachment
     );
 
-    QueueFamilyIndices indices = Device::findQueueFamilies(physicalDevice, surface);
+    QueueFamilyIndices indices = m_device->findQueueFamilies();
     uint32_t queueFamilyIndices[] = { indices.graphicsFamily.value(), indices.presentFamily.value() };
 
     if (indices.graphicsFamily != indices.presentFamily) {
@@ -663,20 +667,6 @@ private:
       }
     }
   }
-  void createCommandPool()
-  {
-    QueueFamilyIndices queueFamilyIndices = Device::findQueueFamilies(device, surface);
-
-    vk::CommandPoolCreateInfo poolInfo = {};
-    poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
-
-    try {
-      commandPool = device->createCommandPool(poolInfo);
-    }
-    catch (vk::SystemError &err) {
-      throw std::runtime_error("failed to create command pool!");
-    }
-  }
 
   void createDescriptorPool()
   {
@@ -861,7 +851,7 @@ private:
 
     vk::MemoryAllocateInfo allocInfo = {};
     allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
+    allocInfo.memoryTypeIndex = m_device->findMemoryType(memRequirements.memoryTypeBits, properties);
 
     try {
       bufferMemory = device->allocateMemory(allocInfo);
@@ -877,7 +867,7 @@ private:
   {
     vk::CommandBufferAllocateInfo allocInfo = {};
     allocInfo.level = vk::CommandBufferLevel::ePrimary;
-    allocInfo.commandPool = commandPool;
+    allocInfo.commandPool = m_device->commandPool;
     allocInfo.commandBufferCount = 1;
 
     vk::CommandBuffer commandBuffer = device->allocateCommandBuffers(allocInfo)[0];
@@ -899,32 +889,19 @@ private:
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &commandBuffer;
 
-    device.graphicsQueue.submit(submitInfo, nullptr);
-    device.graphicsQueue.waitIdle();
+    m_device->graphicsQueue.submit(submitInfo, nullptr);
+    m_device->graphicsQueue.waitIdle();
 
-    device->freeCommandBuffers(commandPool, commandBuffer);
+    device->freeCommandBuffers(m_device->commandPool, commandBuffer);
   }
 
-  uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties)
-  {
-    vk::PhysicalDevice &physicalDevice = device;
-    vk::PhysicalDeviceMemoryProperties memProperties = physicalDevice.getMemoryProperties();
-
-    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
-      if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
-        return i;
-      }
-    }
-
-    throw std::runtime_error("failed to find suitable memory type!");
-  }
 
   void createCommandBuffers()
   {
     commandBuffers.resize(swapchainFramebuffers.size());
 
     vk::CommandBufferAllocateInfo allocInfo = {};
-    allocInfo.commandPool = commandPool;
+    allocInfo.commandPool = m_device->commandPool;
     allocInfo.level = vk::CommandBufferLevel::ePrimary;
     allocInfo.commandBufferCount = (uint32_t)commandBuffers.size();
 
@@ -1057,7 +1034,7 @@ private:
     }
 
     try {
-      device.graphicsQueue.submit(submitInfo, inFlightFences[currentFrame]);
+      m_device->graphicsQueue.submit(submitInfo, inFlightFences[currentFrame]);
     }
     catch (vk::SystemError &err) {
       throw std::runtime_error("failed to submit draw command buffer!");
@@ -1074,7 +1051,7 @@ private:
 
     vk::Result resultPresent;
     try {
-      resultPresent = device.presentQueue.presentKHR(presentInfo);
+      resultPresent = m_device->presentQueue.presentKHR(presentInfo);
     }
     catch (vk::OutOfDateKHRError &err) {
       resultPresent = vk::Result::eErrorOutOfDateKHR;
@@ -1164,7 +1141,8 @@ private:
   std::vector<const char *> getRequiredExtensions()
   {
 
-    std::vector<const char *> extensions = m_surfaceInfo.glfwExtensions;
+    // std::vector<const char *> extensions = m_surfaceInfo.glfwExtensions;
+    std::vector<const char *> extensions = { "VK_KHR_surface", "VK_KHR_win32_surface" };
 
     if (vdb::enableValidationLayers) {
       extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);

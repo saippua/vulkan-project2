@@ -1,0 +1,11 @@
+Index:
+  Background: Build     # Or 'Skip'
+
+Diagnostics:
+#  ClangTidy:
+
+  UnusedIncludes: Strict
+  
+
+CompileFlags:
+  Compiler: /home/saippua/Software/llvm-mingw-20230614-ucrt-ubuntu-20.04-x86_64/bin/x86_64-w64-mingw32-clang++

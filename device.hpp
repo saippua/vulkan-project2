@@ -2,6 +2,7 @@
 #ifndef DEVICE_HH
 #define DEVICE_HH
 
+#define VK_USE_PLATFORM_WIN32_KHR
 #include <vulkan/vulkan.hpp> // possible bug: VK_USE_PLATFORM_WIN32_KHR not defined here
 #include <set>
 #include <string>
@@ -33,46 +34,36 @@ struct SwapchainSupportDetails {
 
 class Device {
 public:
-  Device(vk::Instance *instance_, vk::SurfaceKHR *surface_) : instance(instance_), surface(surface_) {}
-
-  operator vk::Device&() { 
-    if (isInitialized) {
-      return device;
-    } else {
-      throw std::runtime_error("Device not initialized!");
-    }
+  Device(vk::Instance instance_) : instance(instance_) {
+    pickPhysicalDevice();
+    createLogicalDevice();
+    createCommandPool();
   }
 
-  operator vk::PhysicalDevice&() { 
-    if (isInitialized) {
-      return physicalDevice;
-    } else {
-      throw std::runtime_error("Device not initialized!");
-    }
+  ~Device() {
+    device.destroyCommandPool(commandPool);
+    device.destroy();
+  }
+
+  operator vk::Device&() { 
+    return device;
   }
 
   vk::Device* operator->() { return &device; }
 
   vk::Queue graphicsQueue;
   vk::Queue presentQueue;
-
-  void initialize() {
-    pickPhysicalDevice();
-    createLogicalDevice();
-    isInitialized = true;
-  }
+  vk::CommandPool commandPool;
 
 private:
-  bool isInitialized = false;
   vk::PhysicalDevice physicalDevice;
   vk::Device device;
-  vk::Instance *instance;
-  vk::SurfaceKHR *surface;
+  vk::Instance instance;
 
 
   void pickPhysicalDevice()
   {
-    auto devices = instance->enumeratePhysicalDevices();
+    auto devices = instance.enumeratePhysicalDevices();
     if (devices.size() == 0) {
       throw std::runtime_error("failed to find GPUs with Vulkan support!");
     }
@@ -91,7 +82,7 @@ private:
 
   void createLogicalDevice()
   {
-    QueueFamilyIndices indices = findQueueFamilies(physicalDevice, *surface);
+    QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
 
     std::vector<vk::DeviceQueueCreateInfo> queueCreateInfos;
     std::set<uint32_t> uniqueQueueFamilies = { indices.graphicsFamily.value(), indices.presentFamily.value() };
@@ -131,21 +122,35 @@ private:
     presentQueue = device.getQueue(indices.presentFamily.value(), 0);
   }
 
+  void createCommandPool()
+  {
+    QueueFamilyIndices queueFamilyIndices = Device::findQueueFamilies(physicalDevice);
+
+    vk::CommandPoolCreateInfo poolInfo = {};
+    poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
+
+    try {
+      commandPool = device.createCommandPool(poolInfo);
+    }
+    catch (vk::SystemError &err) {
+      throw std::runtime_error("failed to create command pool!");
+    }
+  }
+
   bool isDeviceSuitable(const vk::PhysicalDevice &device)
   {
-    QueueFamilyIndices indices = findQueueFamilies(device, *surface);
+    QueueFamilyIndices indices = findQueueFamilies(device);
 
     bool extensionsSupported = checkDeviceExtensionSupport(device);
     bool featuresSupported = checkDeviceFeatureSupport(device);
 
-    bool swapchainAdequate = false;
-    if (extensionsSupported) {
-      SwapchainSupportDetails swapchainSupport = querySwapchainSupport(device, *surface);
-      swapchainAdequate = !swapchainSupport.formats.empty() && !swapchainSupport.presentModes.empty();
-    }
+    bool swapchainAdequate = true;
+    // if (extensionsSupported) {
+    //   SwapchainSupportDetails swapchainSupport = querySwapchainSupport(device, *surface);
+    //   swapchainAdequate = !swapchainSupport.formats.empty() && !swapchainSupport.presentModes.empty();
+    // }
 
     return indices.isComplete() && extensionsSupported && featuresSupported && swapchainAdequate;
-    // return extensionsSupported && featuresSupported;
   }
 
   bool checkDeviceExtensionSupport(const vk::PhysicalDevice &device)
@@ -161,7 +166,7 @@ private:
 
   bool checkDeviceFeatureSupport(const vk::PhysicalDevice &device)
   {
-    VkPhysicalDeviceFeatures deviceFeatures = device.getFeatures();
+    const VkPhysicalDeviceFeatures deviceFeatures = device.getFeatures();
     // NOTE: This functions implementation is a bit sketchy. It depends on the structure memory being contiguous and
     // there being no padding.
 
@@ -183,7 +188,8 @@ private:
 
 public:
 
-  static QueueFamilyIndices findQueueFamilies(const vk::PhysicalDevice &physicalDevice, const vk::SurfaceKHR &surface)
+  QueueFamilyIndices findQueueFamilies() { return findQueueFamilies(physicalDevice); }
+  QueueFamilyIndices findQueueFamilies(const vk::PhysicalDevice &physicalDevice)
   {
     QueueFamilyIndices indices;
 
@@ -195,7 +201,7 @@ public:
         indices.graphicsFamily = i;
       }
 
-      if (queueFamily.queueCount > 0 && physicalDevice.getSurfaceSupportKHR(i, surface)) {
+      if (queueFamily.queueCount > 0 && physicalDevice.getWin32PresentationSupportKHR(i)) {
         indices.presentFamily = i;
       }
 
@@ -207,14 +213,28 @@ public:
     return indices;
   }
 
-  static SwapchainSupportDetails querySwapchainSupport(const vk::PhysicalDevice &device, const vk::SurfaceKHR &surface)
+  SwapchainSupportDetails querySwapchainSupport(const vk::SurfaceKHR &surface)
   {
     SwapchainSupportDetails details;
-    details.capabilities = device.getSurfaceCapabilitiesKHR(surface);
-    details.formats = device.getSurfaceFormatsKHR(surface);
-    details.presentModes = device.getSurfacePresentModesKHR(surface);
+    details.capabilities = physicalDevice.getSurfaceCapabilitiesKHR(surface);
+    details.formats = physicalDevice.getSurfaceFormatsKHR(surface);
+    details.presentModes = physicalDevice.getSurfacePresentModesKHR(surface);
 
     return details;
+  }
+
+  uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties)
+  {
+    // vk::PhysicalDevice &physicalDevice = device;
+    vk::PhysicalDeviceMemoryProperties memProperties = physicalDevice.getMemoryProperties();
+
+    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+      if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+        return i;
+      }
+    }
+
+    throw std::runtime_error("failed to find suitable memory type!");
   }
 };
 
